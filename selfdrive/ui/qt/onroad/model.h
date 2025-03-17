@@ -26,9 +26,10 @@ private:
   bool longitudinal_control = false;
   bool experimental_mode = false;
   float blend_factor = 1.0f;
-  bool prev_allow_throttle = false;
+  bool prev_allow_throttle = true;
   float lane_line_probs[4] = {};
   float road_edge_stds[2] = {};
+  float path_offset_z = 1.22f;
   QPolygonF track_vertices;
   QPolygonF lane_line_vertices[4] = {};
   QPolygonF road_edge_vertices[2] = {};

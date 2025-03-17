@@ -13,7 +13,8 @@
 #include "selfdrive/ui/qt/qt_window.h"
 #include "selfdrive/ui/qt/widgets/prime.h"
 #include "selfdrive/ui/qt/widgets/scrollview.h"
-#include "selfdrive/ui/qt/widgets/ssh_keys.h"
+#include "selfdrive/ui/qt/offroad/developer_panel.h"
+#include "selfdrive/ui/qt/offroad/firehose.h"
 
 TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
   // param, title, desc, icon
@@ -23,15 +24,6 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       tr("Enable openpilot"),
       tr("Use the openpilot system for adaptive cruise control and lane keep driver assistance. Your attention is required at all times to use this feature. Changing this setting takes effect when the car is powered off."),
       "../assets/img_chffr_wheel.png",
-    },
-    {
-      "ExperimentalLongitudinalEnabled",
-      tr("openpilot Longitudinal Control (Alpha)"),
-      QString("<b>%1</b><br><br>%2")
-      .arg(tr("WARNING: openpilot longitudinal control is in alpha for this car and will disable Automatic Emergency Braking (AEB)."))
-      .arg(tr("On this car, openpilot defaults to the car's built-in ACC instead of openpilot's longitudinal control. "
-              "Enable this to switch to openpilot longitudinal control. Enabling Experimental mode is recommended when enabling openpilot longitudinal control alpha.")),
-      "../assets/offroad/icon_speed_limit.png",
     },
     {
       "ExperimentalMode",
@@ -101,11 +93,6 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
   // Toggles with confirmation dialogs
   toggles["ExperimentalMode"]->setActiveIcon("../assets/img_experimental.svg");
   toggles["ExperimentalMode"]->setConfirmation(true, true);
-  toggles["ExperimentalLongitudinalEnabled"]->setConfirmation(true, false);
-
-  connect(toggles["ExperimentalLongitudinalEnabled"], &ToggleControl::toggleFlipped, [=]() {
-    updateToggles();
-  });
 }
 
 void TogglesPanel::updateState(const UIState &s) {
@@ -130,7 +117,6 @@ void TogglesPanel::showEvent(QShowEvent *event) {
 
 void TogglesPanel::updateToggles() {
   auto experimental_mode_toggle = toggles["ExperimentalMode"];
-  auto op_long_toggle = toggles["ExperimentalLongitudinalEnabled"];
   const QString e2e_description = QString("%1<br>"
                                           "<h4>%2</h4><br>"
                                           "%3<br>"
@@ -151,10 +137,6 @@ void TogglesPanel::updateToggles() {
     capnp::FlatArrayMessageReader cmsg(aligned_buf.align(cp_bytes.data(), cp_bytes.size()));
     cereal::CarParams::Reader CP = cmsg.getRoot<cereal::CarParams>();
 
-    if (!CP.getExperimentalLongitudinalAvailable() || is_release) {
-      params.remove("ExperimentalLongitudinalEnabled");
-    }
-    op_long_toggle->setVisible(CP.getExperimentalLongitudinalAvailable() && !is_release);
     if (hasLongitudinalControl(CP)) {
       // normal description and toggle
       experimental_mode_toggle->setEnabled(true);
@@ -183,7 +165,6 @@ void TogglesPanel::updateToggles() {
     experimental_mode_toggle->refresh();
   } else {
     experimental_mode_toggle->setDescription(e2e_description);
-    op_long_toggle->setVisible(false);
   }
 }
 
@@ -340,11 +321,26 @@ void SettingsWindow::showEvent(QShowEvent *event) {
 }
 
 void SettingsWindow::setCurrentPanel(int index, const QString &param) {
+  if (!param.isEmpty()) {
+    // Check if param ends with "Panel" to determine if it's a panel name
+    if (param.endsWith("Panel")) {
+      QString panelName = param;
+      panelName.chop(5); // Remove "Panel" suffix
+      
+      // Find the panel by name
+      for (int i = 0; i < nav_btns->buttons().size(); i++) {
+        if (nav_btns->buttons()[i]->text() == tr(panelName.toStdString().c_str())) {
+          index = i;
+          break;
+        }
+      }
+    } else {
+      emit expandToggleDescription(param);
+    }
+  }
+  
   panel_widget->setCurrentIndex(index);
   nav_btns->buttons()[index]->setChecked(true);
-  if (!param.isEmpty()) {
-    emit expandToggleDescription(param);
-  }
 }
 
 SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
@@ -389,6 +385,8 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
     {tr("Network"), networking},
     {tr("Toggles"), toggles},
     {tr("Software"), new SoftwarePanel(this)},
+    {tr("Firehose"), new FirehosePanel(this)},
+    {tr("Developer"), new DeveloperPanel(this)},
   };
 
   nav_btns = new QButtonGroup(this);

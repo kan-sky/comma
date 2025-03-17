@@ -155,9 +155,9 @@ static void tick_handler(void) {
 
     // tick drivers at 8Hz
     fan_tick();
-    usb_tick();
     harness_tick();
     simple_watchdog_kick();
+    sound_tick();
 
     // re-init everything that uses harness status
     if (harness.status != prev_harness_status) {
@@ -215,7 +215,7 @@ static void tick_handler(void) {
       }
 
       if (controls_allowed || heartbeat_engaged) {
-        controls_allowed_countdown = 30U;
+        controls_allowed_countdown = 5U;
       } else if (controls_allowed_countdown > 0U) {
         controls_allowed_countdown -= 1U;
       } else {
@@ -240,7 +240,7 @@ static void tick_handler(void) {
           print(" seconds. Safety is set to SILENT mode.\n");
 
           if (controls_allowed_countdown > 0U) {
-            siren_countdown = 5U;
+            siren_countdown = 3U;
             controls_allowed_countdown = 0U;
           }
 
@@ -263,11 +263,9 @@ static void tick_handler(void) {
           // Also disable IR when the heartbeat goes missing
           current_board->set_ir_power(0U);
 
-          // Run fan when device is up, but not talking to us
-          // * bootloader enables the SOM GPIO on boot
-          // * fallback to USB enumerated where supported
-          bool enabled = usb_enumerated || current_board->read_som_gpio();
-          fan_set_power(enabled ? 50U : 0U);
+          // Run fan when device is up but not talking to us.
+          // The bootloader enables the SOM GPIO on boot.
+          fan_set_power(current_board->read_som_gpio() ? 30U : 0U);
         }
       }
 
@@ -325,11 +323,12 @@ int main(void) {
   // panda has an FPU, let's use it!
   enable_fpu();
 
+  microsecond_timer_init();
+
+  current_board->set_siren(false);
   if (current_board->fan_max_rpm > 0U) {
     fan_init();
   }
-
-  microsecond_timer_init();
 
   // init to SILENT and can silent
   set_safety_mode(SAFETY_SILENT, 0U);

@@ -1,12 +1,8 @@
-Version 0.9.9 (2025-04-XX)
-========================
-* Tesla Model 3 and Y support thanks to lukasloetkolben!
-
 Version 0.9.8 (2025-02-28)
 ========================
 * New driving model
   * Model now gates applying positive acceleration in Chill mode
-* New driving monitoring model
+* New driver monitoring model
   * Reduced false positives related to passengers
 * Image processing pipeline moved to the ISP
   * More GPU time for bigger driving models
